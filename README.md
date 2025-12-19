@@ -29,63 +29,25 @@
 ## 🏗️ Architecture
 
 Tiny-Muduo follows the **Multi-Reactors** pattern:
-- **MainReactor (Acceptor)**: Handles new connection requests (`accept`) and distributes them to SubReactors.
-- **SubReactors (EventLoop)**: Handle read/write/error events on established connections.
 
-
-
-## 🛠️ Build & Install
-
-### Prerequisites
-- OS: Linux (tested on Ubuntu 20.04/CentOS 7)
-- Compiler: GCC >= 4.8 (C++11 support required)
-- Tool: CMake
-
-### Build
-```bash
-git clone [https://github.com/zouzexu999/Tiny-Muduo.git](https://github.com/zouzexu999/Tiny-Muduo.git)
-cd Tiny-Muduo
-./autobuild.sh
-#include <mymuduo/TcpServer.h>
-#include <mymuduo/Logger.h>
-#include <string>
-
-class EchoServer {
-public:
-    EchoServer(EventLoop *loop, const InetAddress &addr, const std::string &name)
-        : server_(loop, addr, name), loop_(loop) {
-        // Register callbacks
-        server_.setConnectionCallback(std::bind(&EchoServer::onConnection, this, std::placeholders::_1));
-        server_.setMessageCallback(std::bind(&EchoServer::onMessage, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
-        server_.setThreadNum(3); // Set thread pool size
-    }
+```mermaid
+graph TD
+    Client(Clients) --> |SYN| Acceptor
     
-    void start() { server_.start(); }
-
-private:
-    void onConnection(const TcpConnectionPtr &conn) {
-        if (conn->connected()) {
-            LOG_INFO("Connection UP : %s", conn->peerAddress().toIpPort().c_str());
-        } else {
-            LOG_INFO("Connection DOWN : %s", conn->peerAddress().toIpPort().c_str());
-        }
-    }
-
-    void onMessage(const TcpConnectionPtr &conn, Buffer *buf, Timestamp time) {
-        std::string msg = buf->retrieveAllAsString();
-        conn->send(msg); // Echo back
-        conn->shutdown(); // Close connection
-    }
-
-    TcpServer server_;
-    EventLoop *loop_;
-};
-
-int main() {
-    EventLoop loop;
-    InetAddress addr(8000);
-    EchoServer server(&loop, addr, "EchoServer-01"); 
-    server.start(); 
-    loop.loop(); 
-    return 0;
-}
+    subgraph MainReactor [Main Reactor / Acceptor]
+        Acceptor(Acceptor)
+    end
+    
+    subgraph SubReactors [Sub Reactors / EventLoop Thread Pool]
+        Loop1(EventLoop 1)
+        Loop2(EventLoop 2)
+        Loop3(EventLoop 3)
+    end
+    
+    Acceptor -.-> |New Connection & Round Robin| Loop1
+    Acceptor -.-> |New Connection| Loop2
+    Acceptor -.-> |New Connection| Loop3
+    
+    Loop1 --> |Read/Write| Conn1(TcpConnection)
+    Loop2 --> |Read/Write| Conn2(TcpConnection)
+    Loop3 --> |Read/Write| Conn3(TcpConnection)
