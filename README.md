@@ -11,20 +11,15 @@
 
 ## 📖 Introduction
 
-**Tiny-Muduo** is a reactor-pattern-based network library developed on Linux, designed for high-concurrency TCP connections. It strips away the complex template magic of the original Muduo library and rewrites core components using **C++11 features** (smart pointers, lambda expressions, `std::function`, `std::bind`, etc.), making the code cleaner and easier to understand.
+**Tiny-Muduo** is a reactor-pattern-based network library developed on Linux. It strips away the complex template magic of the original Muduo library and rewrites core components using **C++11 features** (smart pointers, lambda expressions, etc.), making the code cleaner and easier to understand.
 
-**Tiny-Muduo** 是一个基于 Reactor 模式的高性能网络库。它去除了原版 Muduo 中复杂的 Boost 依赖，完全使用 C++11 重构。核心目标是提供一个轻量级、易于学习且性能优秀的网络编程框架。
+**Tiny-Muduo** 是一个基于 Reactor 模式的高性能网络库。它去除了原版 Muduo 中复杂的 Boost 依赖，完全使用 C++11 重构。
 
 ## ✨ Key Features
 
 - **Event Loop Model**: One Loop Per Thread + Non-blocking I/O + Epoll (Level Trigger).
-- **Modern C++**: Heavy use of `std::shared_ptr`, `std::unique_ptr` for memory management, avoiding raw pointers.
-- **Components**:
-  - **Buffer**: A dynamic buffer similar to Netty's ByteBuf (prependable + readable + writable).
-  - **TimerQueue**: Efficient timer management using `timerfd` and `std::set`.
-  - **AsyncLogging**: Double-buffering asynchronous logging system for high performance.
-  - **TcpConnection**: Manages lifecycle of connections using `shared_from_this`.
-- **Thread Safe**: Multi-threaded TCP server implementation with thread pool.
+- **Modern C++**: Heavy use of `std::shared_ptr`, `std::unique_ptr` for memory management.
+- **Components**: Buffer, TimerQueue, AsyncLogging, TcpConnection.
 
 ## 🏗️ Architecture
 
@@ -44,7 +39,7 @@ graph TD
         Loop3(EventLoop 3)
     end
     
-    Acceptor -.-> |New Connection & Round Robin| Loop1
+    Acceptor -.-> |New Connection| Loop1
     Acceptor -.-> |New Connection| Loop2
     Acceptor -.-> |New Connection| Loop3
     
@@ -52,3 +47,53 @@ graph TD
     Loop2 --> |Read/Write| Conn2(TcpConnection)
     Loop3 --> |Read/Write| Conn3(TcpConnection)
 
+
+
+    git clone [https://github.com/zouzexu999/Tiny-Muduo.git](https://github.com/zouzexu999/Tiny-Muduo.git)
+cd Tiny-Muduo
+./autobuild.sh
+
+
+#include <mymuduo/TcpServer.h>
+#include <mymuduo/Logger.h>
+#include <string>
+
+class EchoServer {
+public:
+    EchoServer(EventLoop *loop, const InetAddress &addr, const std::string &name)
+        : server_(loop, addr, name), loop_(loop) {
+        // Register callbacks
+        server_.setConnectionCallback(std::bind(&EchoServer::onConnection, this, std::placeholders::_1));
+        server_.setMessageCallback(std::bind(&EchoServer::onMessage, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
+        server_.setThreadNum(3); // Set thread pool size
+    }
+    
+    void start() { server_.start(); }
+
+private:
+    void onConnection(const TcpConnectionPtr &conn) {
+        if (conn->connected()) {
+            LOG_INFO("Connection UP : %s", conn->peerAddress().toIpPort().c_str());
+        } else {
+            LOG_INFO("Connection DOWN : %s", conn->peerAddress().toIpPort().c_str());
+        }
+    }
+
+    void onMessage(const TcpConnectionPtr &conn, Buffer *buf, Timestamp time) {
+        std::string msg = buf->retrieveAllAsString();
+        conn->send(msg); // Echo back
+        conn->shutdown(); // Close connection
+    }
+
+    TcpServer server_;
+    EventLoop *loop_;
+};
+
+int main() {
+    EventLoop loop;
+    InetAddress addr(8000);
+    EchoServer server(&loop, addr, "EchoServer-01"); 
+    server.start(); 
+    loop.loop(); 
+    return 0;
+}
