@@ -51,3 +51,47 @@ graph TD
     Loop1 --> |Read/Write| Conn1(TcpConnection)
     Loop2 --> |Read/Write| Conn2(TcpConnection)
     Loop3 --> |Read/Write| Conn3(TcpConnection)
+
+#include <mymuduo/TcpServer.h>
+#include <mymuduo/Logger.h>
+#include <string>
+
+class EchoServer {
+public:
+    EchoServer(EventLoop *loop, const InetAddress &addr, const std::string &name)
+        : server_(loop, addr, name), loop_(loop) {
+        // Register callbacks
+        server_.setConnectionCallback(std::bind(&EchoServer::onConnection, this, std::placeholders::_1));
+        server_.setMessageCallback(std::bind(&EchoServer::onMessage, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
+        server_.setThreadNum(3); // Set thread pool size
+    }
+    
+    void start() { server_.start(); }
+
+private:
+    void onConnection(const TcpConnectionPtr &conn) {
+        if (conn->connected()) {
+            LOG_INFO("Connection UP : %s", conn->peerAddress().toIpPort().c_str());
+        } else {
+            LOG_INFO("Connection DOWN : %s", conn->peerAddress().toIpPort().c_str());
+        }
+    }
+
+    void onMessage(const TcpConnectionPtr &conn, Buffer *buf, Timestamp time) {
+        std::string msg = buf->retrieveAllAsString();
+        conn->send(msg); // Echo back
+        conn->shutdown(); // Close connection
+    }
+
+    TcpServer server_;
+    EventLoop *loop_;
+};
+
+int main() {
+    EventLoop loop;
+    InetAddress addr(8000);
+    EchoServer server(&loop, addr, "EchoServer-01"); 
+    server.start(); 
+    loop.loop(); 
+    return 0;
+}
