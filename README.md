@@ -50,14 +50,16 @@ graph TD
 ```
 ## 🛠️ Build & Install
 
-git clone https://github.com/zouzexu999/Tiny-Muduo.git
+```bash
+git clone [https://github.com/zouzexu999/Tiny-Muduo.git](https://github.com/zouzexu999/Tiny-Muduo.git)
 cd Tiny-Muduo
 ./autobuild.sh
-```
-```
+
 ## 🚀 Usage Example
 
 Here is a simple Echo Server:
+
+```cpp
 #include <mymuduo/TcpServer.h>
 #include <mymuduo/Logger.h>
 #include <string>
@@ -101,4 +103,3 @@ int main() {
     loop.loop(); 
     return 0;
 }
-```
